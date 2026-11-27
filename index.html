@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>FleetFlow - Transport Management for Small Fleets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#0a0f1c; --bg2:#0e1526; --card:#111c30; --card2:#16233c; --line:#22304d;
+  --txt:#e8eefb; --dim:#8fa3c2; --acc:#f5a524; --acc2:#2dd4bf; --danger:#f26d6d; --ok:#34d399;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:radial-gradient(1200px 700px at 80% -10%,#14233f 0%,var(--bg) 55%);color:var(--txt);font-family:Inter,system-ui,sans-serif;font-size:14px}
+h1,h2,h3,.brand,.kpi-num,.btn{font-family:Sora,Inter,sans-serif}
+.boot{padding:60px;text-align:center;color:var(--dim)}
+a{color:var(--acc2);text-decoration:none}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;background:var(--bg2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 11px;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid #f5a52455;border-color:var(--acc)}
+label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid #1a2740}
+tr:hover td{background:#ffffff06}
+.muted{color:var(--dim)}
+.small{font-size:12px}
+
+/* layout */
+.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.side{background:linear-gradient(180deg,#0d1626,#0a101d);border-right:1px solid var(--line);padding:22px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{font-size:20px;font-weight:800;padding:0 10px 20px;display:flex;align-items:center;gap:9px}
+.brand .dot{width:12px;height:12px;border-radius:4px;background:linear-gradient(135deg,var(--acc),#e16a10);transform:rotate(45deg);box-shadow:0 0 14px #f5a52488}
+.nav a{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;color:var(--dim);font-weight:600;margin-bottom:2px}
+.nav a:hover{background:#ffffff09;color:var(--txt)}
+.nav a.on{background:linear-gradient(90deg,#f5a52422,#f5a52408);color:var(--acc)}
+.side .foot{margin-top:auto;font-size:11px;color:#5a6b88;padding:10px;line-height:1.5}
+.main{padding:26px 30px 60px;max-width:1220px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:14px;flex-wrap:wrap}
+.topbar h1{font-size:24px;font-weight:800}
+.topbar .sub{color:var(--dim);font-size:13px;margin-top:3px}
+
+/* components */
+.card{background:linear-gradient(160deg,var(--card),#0e1930);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.kpi{background:linear-gradient(150deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.kpi .kpi-num{font-size:26px;font-weight:800;margin-top:6px}
+.kpi .kpi-lab{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.7px;font-weight:600}
+.btn{background:linear-gradient(135deg,var(--acc),#e8890c);color:#1a1206;border:0;border-radius:10px;padding:9px 16px;font-weight:700;display:inline-block}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+.btn.ghost:hover{border-color:var(--acc);color:var(--acc)}
+.btn.teal{background:linear-gradient(135deg,var(--acc2),#0d9488);color:#06231f}
+.btn.danger{background:transparent;border:1px solid #f26d6d55;color:var(--danger)}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:8px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.b-new{background:#3b82f622;color:#7db3ff}.b-planned{background:#a78bfa22;color:#c4b5fd}.b-loading{background:#f5a52422;color:var(--acc)}
+.b-in_transit{background:#2dd4bf22;color:var(--acc2)}.b-completed,.b-delivered{background:#34d39922;color:var(--ok)}
+.b-cancelled{background:#f26d6d22;color:var(--danger)}.b-invoiced{background:#34d39933;color:var(--ok)}
+.b-active{background:#34d39922;color:var(--ok)}.b-on_trip{background:#2dd4bf22;color:var(--acc2)}.b-maintenance,.b-inactive{background:#f26d6d22;color:var(--danger)}
+.demo-tag{background:#f5a5241c;color:var(--acc);border:1px dashed #f5a52455;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700}
+.modal-wrap{position:fixed;inset:0;background:#05080fb8;backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;z-index:200;overflow:auto;padding:40px 16px}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;width:100%;max-width:640px}
+.modal h2{font-size:18px;margin-bottom:6px}
+.mapbox{border-radius:var(--radius);overflow:hidden;border:1px solid var(--line)}
+#tripmap,#dashmap{height:340px;background:#0a101d}
+.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px}
+.timeline .ev{position:relative;padding:0 0 14px}
+.timeline .ev::before{content:'';position:absolute;left:-25px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px #f5a52488}
+.chart-box{position:relative;height:260px}
+.notice{background:#2dd4bf14;border:1px solid #2dd4bf44;color:var(--acc2);padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px}
+.warn{background:#f5a52414;border:1px solid #f5a52444;color:var(--acc);padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px}
+.err{background:#f26d6d14;border:1px solid #f26d6d44;color:var(--danger);padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px}
+.sharelink{background:var(--bg2);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--acc2)}
+.sigpad{border:2px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;width:100%;height:180px}
+.searchbar{display:flex;gap:10px;margin-bottom:14px}
+.searchbar input{max-width:320px}
+.empty{padding:34px;text-align:center;color:var(--dim)}
+
+/* auth */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-card{width:100%;max-width:420px;background:linear-gradient(160deg,#132037,#0d1526);border:1px solid var(--line);border-radius:20px;padding:34px}
+.auth-card .brand{justify-content:center;padding-bottom:6px}
+.auth-card .tag{text-align:center;color:var(--dim);font-size:13px;margin-bottom:22px}
+
+/* driver mode */
+.drive{max-width:520px;margin:0 auto;padding:22px 16px 60px;min-height:100vh}
+.drive .big-btn{width:100%;padding:18px;font-size:17px;border-radius:14px;margin-bottom:12px}
+.drive .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.drive .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.gps-on{color:var(--ok);font-weight:700}.gps-off{color:var(--danger);font-weight:700}
+.leaflet-container{font-family:Inter,sans-serif}
+.pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 #34d39988;animation:pulse 1.6s infinite;margin-right:6px}
+@keyframes pulse{70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px}
+  .brand{padding:6px 10px}
+  .nav{display:flex;flex-wrap:wrap;gap:2px}
+  .side .foot{display:none}
+  .main{padding:16px}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+}
+
+</style>
+</head>
+<body>
+<div id="app"><div class="boot">Loading FleetFlow...</div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+/* FleetFlow TMS - frontend SPA */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let ME = null, COMPANY = { currency: 'EUR', name: 'FleetFlow' };
+const fmtM = (c) => new Intl.NumberFormat('en', { style: 'currency', currency: COMPANY.currency || 'EUR' }).format((c || 0) / 100);
+const fmtD = (d) => (d ? new Date(d).toLocaleDateString('en-GB') : '-');
+const fmtDT = (d) => (d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-');
+const badge = (s) => `<span class="badge b-${esc(s)}">${esc(String(s).replace('_', ' '))}</span>`;
+
+async function api(path, opts = {}) {
+  const r = await fetch('/api' + path, {
+    method: opts.method || 'GET',
+    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (r.status === 401 && !path.startsWith('/drive') && !path.startsWith('/login') && !path.startsWith('/bootstrap')) {
+    location.hash = '#/login';
+    throw new Error('auth');
+  }
+  const js = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(js.error || 'Request failed');
+  return js;
+}
+
+function toast(msg, bad) {
+  const t = document.createElement('div');
+  t.className = bad ? 'err' : 'notice';
+  t.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:999;max-width:340px;box-shadow:0 8px 30px #0008';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3800);
+}
+
+// ---------- icons (inline svg, stroke) ----------
+const I = (p) => `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const icons = {
+  dash: I('<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>'),
+  orders: I('<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3.3 8.3L12 13l8.7-4.7M12 13v9"/>'),
+  trips: I('<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a3 3 0 0 0 3-3v-3M16 5H8a3 3 0 0 0-3 3v3"/>'),
+  fleet: I('<path d="M1 8h13v9H1zM14 11h4l3 3v3h-7z"/><circle cx="6" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/>'),
+  customers: I('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.2 3.2 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.7"/>'),
+  reports: I('<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/>'),
+  settings: I('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/>'),
+  pin: I('<path d="M12 21s-7-5.3-7-11a7 7 0 0 1 14 0c0 5.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>'),
+  truck: I('<path d="M1 8h13v9H1zM14 11h4l3 3v3h-7z"/><circle cx="6" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/>'),
+};
+
+// ---------- shell ----------
+function shell(active, content) {
+  const nav = [
+    ['#/dashboard', 'Dashboard', icons.dash], ['#/orders', 'Orders', icons.orders],
+    ['#/trips', 'Trips', icons.trips], ['#/fleet', 'Fleet', icons.fleet],
+    ['#/customers', 'Customers', icons.customers], ['#/reports', 'Reports', icons.reports],
+    ['#/settings', 'Settings', icons.settings],
+  ];
+  $('#app').innerHTML = `
+  <div class="shell">
+    <aside class="side">
+      <div class="brand"><span class="dot"></span>FleetFlow</div>
+      <nav class="nav">${nav.map(([h, l, ic]) => `<a href="${h}" class="${active === h ? 'on' : ''}">${ic}${l}</a>`).join('')}</nav>
+      <div class="foot">
+        <b>${esc(COMPANY.name || '')}</b><br>
+        Lightweight TMS for small fleets.<br>
+        Free &amp; open stack: OSM maps, no subscriptions.<br><br>
+        <a href="#" id="logout">Sign out (${esc(ME ? ME.name : '')})</a>
+      </div>
+    </aside>
+    <main class="main" id="view">${content}</main>
+  </div>`;
+  $('#logout')?.addEventListener('click', async (e) => { e.preventDefault(); await api('/logout', { method: 'POST' }); location.reload(); });
+}
+
+function topbar(title, sub, btns = '') {
+  return `<div class="topbar"><div><h1>${title}</h1><div class="sub">${sub || ''}</div></div><div class="btnrow">${btns}</div></div>`;
+}
+
+// ---------- modal ----------
+function modal(title, body, onSave, saveLabel = 'Save') {
+  const w = document.createElement('div');
+  w.className = 'modal-wrap';
+  w.innerHTML = `<div class="modal"><h2>${title}</h2><div class="mbody">${body}</div>
+    <div class="btnrow" style="margin-top:18px;justify-content:flex-end">
+      <button class="btn ghost" data-x>Cancel</button>
+      ${onSave ? `<button class="btn" data-ok>${saveLabel}</button>` : ''}
+    </div></div>`;
+  document.body.appendChild(w);
+  w.addEventListener('click', (e) => { if (e.target === w || e.target.hasAttribute('data-x')) w.remove(); });
+  if (onSave) $('[data-ok]', w).addEventListener('click', async () => {
+    const data = {};
+    $$('input,select,textarea', w).forEach((i) => { if (i.name) data[i.name] = i.value; });
+    try { await onSave(data, w); w.remove(); } catch (e) { toast(e.message, true); }
+  });
+  return w;
+}
+
+// ---------- maps ----------
+const tileLayer = () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' });
+function truckIcon(color = '#f5a524') {
+  return L.divIcon({
+    className: '', iconSize: [30, 30], iconAnchor: [15, 15],
+    html: `<div style="width:30px;height:30px;border-radius:50%;background:${color};border:3px solid #0a0f1c;box-shadow:0 0 12px ${color}aa;display:flex;align-items:center;justify-content:center">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0a0f1c" stroke-width="2.6"><path d="M1 8h13v9H1zM14 11h4l3 3v3h-7z"/><circle cx="6" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/></svg></div>`,
+  });
+}
+function pinIcon(color) {
+  return L.divIcon({ className: '', iconSize: [18, 18], iconAnchor: [9, 9],
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:3px solid #0a0f1c;box-shadow:0 0 8px ${color}"></div>` });
+}
+
+// ---------- DASHBOARD ----------
+async function vDashboard() {
+  const d = await api('/dashboard');
+  const k = d.kpi;
+  shell('#/dashboard', `
+    ${topbar('Dashboard', esc(COMPANY.name || '') + ' - fleet at a glance', `<a class="btn" href="#/trips">+ New trip</a>`)}
+    <div class="grid g4">
+      <div class="kpi"><div class="kpi-lab">Open orders</div><div class="kpi-num">${k.open_orders}</div></div>
+      <div class="kpi"><div class="kpi-lab">Active trips</div><div class="kpi-num">${k.active_trips}</div></div>
+      <div class="kpi"><div class="kpi-lab">Trucks free</div><div class="kpi-num" style="color:var(--acc2)">${k.trucks_free}/${k.trucks_total}</div></div>
+      <div class="kpi"><div class="kpi-lab">Margin this month</div><div class="kpi-num" style="color:${k.month_revenue - k.month_costs >= 0 ? 'var(--ok)' : 'var(--danger)'}">${fmtM(k.month_revenue - k.month_costs)}</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h3 style="margin-bottom:12px">Revenue vs costs (6 months)</h3><div class="chart-box"><canvas id="mchart"></canvas></div></div>
+      <div class="card"><h3 style="margin-bottom:12px">Live fleet map</h3><div class="mapbox"><div id="dashmap"></div></div>
+        <div class="small muted" style="margin-top:8px">Trucks with drivers sharing live GPS appear here.</div></div>
+    </div>
+    <div class="card"><h3 style="margin-bottom:12px">Recent activity</h3>
+      ${d.recent.length ? `<div class="timeline">${d.recent.map((e) => `<div class="ev"><b>${esc(e.code)}</b> - ${esc(e.note || e.kind)}<div class="small muted">${fmtDT(e.ts)}</div></div>`).join('')}</div>` : '<div class="empty">No activity yet. Create your first trip to get started.</div>'}
+    </div>`);
+  const ctx = $('#mchart');
+  if (ctx && window.Chart) {
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels: d.monthly.map((m) => m.month), datasets: [
+        { label: 'Revenue', data: d.monthly.map((m) => m.revenue / 100), backgroundColor: '#2dd4bf' },
+        { label: 'Costs', data: d.monthly.map((m) => m.costs / 100), backgroundColor: '#f5a524' },
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8fa3c2' } } },
+        scales: { x: { ticks: { color: '#8fa3c2' }, grid: { color: '#22304d' } }, y: { ticks: { color: '#8fa3c2' }, grid: { color: '#22304d' } } } },
+    });
+  }
+  const mapEl = $('#dashmap');
+  if (mapEl && window.L) {
+    const map = L.map('dashmap', { zoomControl: true });
+    tileLayer().addTo(map);
+    const pts = [];
+    d.active.forEach((t) => {
+      if (t.last_loc) {
+        const m = L.marker([t.last_loc.lat, t.last_loc.lon], { icon: truckIcon('#2dd4bf') }).addTo(map)
+          .bindPopup(`<b>${esc(t.code)}</b><br>${esc(t.driver_name || '')} - ${esc(t.plate || '')}<br><small>last seen ${fmtDT(t.last_loc.ts)}</small>`);
+        pts.push(m.getLatLng());
+      }
+    });
+    pts.length ? map.fitBounds(L.latLngBounds(pts).pad(0.3)) : map.setView([30, 15], 2);
+  }
+}
+
+// ---------- ORDERS ----------
+async function vOrders() {
+  const [orders, customers] = await Promise.all([api('/orders'), api('/customers')]);
+  shell('#/orders', `
+    ${topbar('Orders', 'Transport orders from your customers', `<button class="btn" id="new">+ New order</button>`)}
+    <div class="card"><table><thead><tr><th>Code</th><th>Customer</th><th>Route</th><th>Goods</th><th>Price</th><th>Status</th><th></th></tr></thead>
+    <tbody>${orders.map((o) => `<tr>
+      <td><b>${esc(o.code)}</b>${o.is_demo ? ' <span class="demo-tag">DEMO</span>' : ''}</td>
+      <td>${esc(o.customer_name || '-')}</td>
+      <td class="small">${esc(o.pickup_addr)}<br><span class="muted">&rarr; ${esc(o.delivery_addr)}</span></td>
+      <td class="small">${esc(o.goods || '-')}<br><span class="muted">${o.weight_kg} kg / ${o.pallets} pal</span></td>
+      <td>${fmtM(o.price_cents)}</td><td>${badge(o.status)}</td>
+      <td style="white-space:nowrap"><button class="btn sm ghost" data-edit="${o.id}">Edit</button></td></tr>`).join('')}
+    </tbody></table>${orders.length ? '' : '<div class="empty">No orders yet. Click "+ New order" or load demo data from Settings.</div>'}</div>`);
+  $('#new').addEventListener('click', () => orderForm(null, customers));
+  $$('[data-edit]').forEach((b) => b.addEventListener('click', () => orderForm(orders.find((o) => o.id == b.dataset.edit), customers)));
+}
+
+function orderForm(o, customers) {
+  modal(o ? 'Edit ' + o.code : 'New order', `
+    <div class="grid g2">
+      <div><label>Customer</label><select name="customer_id"><option value="">-</option>${customers.map((c) => `<option value="${c.id}" ${o && o.customer_id == c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+      <div><label>Agreed price (${esc(COMPANY.currency)})</label><input name="price" type="number" step="0.01" min="0" value="${o ? o.price_cents / 100 : ''}"></div>
+    </div>
+    <label>Pickup address</label><div style="display:flex;gap:8px"><input name="pickup_addr" value="${esc(o?.pickup_addr || '')}" placeholder="Street, city, country"><button type="button" class="btn ghost sm" data-geo="pickup" title="Find on map">${icons.pin}</button></div>
+    <div class="small muted" data-geoout="pickup">${o?.pickup_lat ? `Located: ${o.pickup_lat.toFixed(4)}, ${o.pickup_lon.toFixed(4)}` : ''}</div>
+    <label>Delivery address</label><div style="display:flex;gap:8px"><input name="delivery_addr" value="${esc(o?.delivery_addr || '')}" placeholder="Street, city, country"><button type="button" class="btn ghost sm" data-geo="delivery" title="Find on map">${icons.pin}</button></div>
+    <div class="small muted" data-geoout="delivery">${o?.delivery_lat ? `Located: ${o.delivery_lat.toFixed(4)}, ${o.delivery_lon.toFixed(4)}` : ''}</div>
+    <div class="grid g2">
+      <div><label>Goods</label><input name="goods" value="${esc(o?.goods || '')}" placeholder="e.g. packed food products"></div>
+      <div class="grid g2">
+        <div><label>Weight (kg)</label><input name="weight_kg" type="number" min="0" value="${o?.weight_kg || ''}"></div>
+        <div><label>Pallets</label><input name="pallets" type="number" min="0" value="${o?.pallets || ''}"></div>
+      </div>
+    </div>
+    <div class="grid g2">
+      <div><label>Pickup date</label><input name="pickup_date" type="date" value="${o?.pickup_date ? String(o.pickup_date).slice(0, 10) : ''}"></div>
+      <div><label>Delivery date</label><input name="delivery_date" type="date" value="${o?.delivery_date ? String(o.delivery_date).slice(0, 10) : ''}"></div>
+    </div>
+    <label>Notes</label><textarea name="notes" rows="2">${esc(o?.notes || '')}</textarea>`,
+    async (data, w) => {
+      data.pickup_lat = w.dataset.pickupLat || o?.pickup_lat || null;
+      data.pickup_lon = w.dataset.pickupLon || o?.pickup_lon || null;
+      data.delivery_lat = w.dataset.deliveryLat || o?.delivery_lat || null;
+      data.delivery_lon = w.dataset.deliveryLon || o?.delivery_lon || null;
+      if (o) await api('/orders/' + o.id, { method: 'PUT', body: { ...data, status: o.status } });
+      else await api('/orders', { method: 'POST', body: data });
+      toast(o ? 'Order updated' : 'Order created');
+      vOrders();
+    }, o ? 'Save changes' : 'Create order');
+  const w = $('.modal-wrap:last-child');
+  $$('[data-geo]', w).forEach((b) => b.addEventListener('click', async () => {
+    const kind = b.dataset.geo;
+    const q = $(`input[name=${kind}_addr]`, w).value;
+    if (!q) return toast('Type an address first', true);
+    b.disabled = true;
+    try {
+      const g = await api('/geocode', { method: 'POST', body: { q } });
+      w.dataset[kind + 'Lat'] = g.lat; w.dataset[kind + 'Lon'] = g.lon;
+      $(`[data-geoout=${kind}]`, w).textContent = 'Located: ' + g.label;
+    } catch (e) { toast(e.message, true); }
+    b.disabled = false;
+  }));
+  if (o) {
+    const del = document.createElement('button');
+    del.className = 'btn danger sm'; del.textContent = 'Delete order'; del.style.marginTop = '10px';
+    del.onclick = async () => { if (confirm('Delete this order?')) { await api('/orders/' + o.id, { method: 'DELETE' }); w.remove(); vOrders(); } };
+    $('.mbody', w).appendChild(del);
+  }
+}
+
+// ---------- TRIPS ----------
+async function vTrips() {
+  const [trips, orders, trucks, drivers] = await Promise.all([api('/trips'), api('/orders'), api('/trucks'), api('/drivers')]);
+  const free = orders.filter((o) => o.status === 'new');
+  shell('#/trips', `
+    ${topbar('Trips', 'Plan trips, assign trucks and drivers, track them live', `<button class="btn" id="new">+ New trip</button>`)}
+    ${free.length ? `<div class="notice">${free.length} unplanned order(s) waiting: ${free.slice(0, 4).map((o) => esc(o.code)).join(', ')}${free.length > 4 ? '...' : ''} - open a trip and add them.</div>` : ''}
+    <div class="card"><table><thead><tr><th>Code</th><th>Truck</th><th>Driver</th><th>Orders</th><th>Revenue</th><th>Costs</th><th>Status</th><th>Live</th><th></th></tr></thead>
+    <tbody>${trips.map((t) => `<tr>
+      <td><b>${esc(t.code)}</b>${t.is_demo ? ' <span class="demo-tag">DEMO</span>' : ''}</td>
+      <td>${esc(t.truck_plate || '-')}</td><td>${esc(t.driver_name || '-')}</td>
+      <td>${t.order_count}</td><td>${fmtM(t.revenue_cents)}</td><td>${fmtM(t.cost_cents)}</td>
+      <td>${badge(t.status)}</td>
+      <td>${t.last_loc ? `<span class="pulse"></span><span class="small muted">${fmtDT(t.last_loc.ts)}</span>` : '<span class="muted small">-</span>'}</td>
+      <td><a class="btn sm ghost" href="#/trips/${t.id}">Open</a></td></tr>`).join('')}
+    </tbody></table>${trips.length ? '' : '<div class="empty">No trips yet.</div>'}</div>`);
+  $('#new').addEventListener('click', async () => {
+    if (!trucks.length || !drivers.length) return toast('Add at least one truck and one driver in Fleet first', true);
+    modal('New trip', `
+      <div class="grid g2">
+        <div><label>Truck</label><select name="truck_id">${trucks.filter((t) => t.status === 'active').map((t) => `<option value="${t.id}">${esc(t.plate)} - ${esc(t.label || t.type)}</option>`).join('')}</select></div>
+        <div><label>Driver</label><select name="driver_id">${drivers.filter((d) => d.status === 'active').map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></div>
+      </div>
+      <label>Planned start</label><input name="planned_start" type="datetime-local">
+      <label>Notes</label><textarea name="notes" rows="2"></textarea>`,
+      async (data) => {
+        const t = await api('/trips', { method: 'POST', body: data });
+        toast('Trip ' + t.code + ' created');
+        location.hash = '#/trips/' + t.id;
+      }, 'Create trip');
+  });
+}
+
+let tripPoll = null;
+async function vTripDetail(id) {
+  const d = await api('/trips/' + id);
+  const t = d.trip;
+  const allOrders = await api('/orders');
+  const addable = allOrders.filter((o) => ['new'].includes(o.status));
+  const shareUrl = location.origin + '/#/drive/' + t.share_token;
+  const margin = d.orders.reduce((s, o) => s + o.price_cents, 0) - d.costs.reduce((s, c) => s + c.amount_cents, 0);
+  shell('#/trips', `
+    ${topbar(`Trip ${esc(t.code)}`, `${badge(t.status)} &nbsp; planned ${fmtDT(t.planned_start)}`,
+      `<a class="btn ghost" href="#/trips">Back</a>
+       <a class="btn ghost" href="/api/trips/${t.id}/ddt.pdf" target="_blank">DDT PDF</a>
+       <a class="btn ghost" href="/api/trips/${t.id}/pod.pdf" target="_blank">POD PDF</a>`)}
+    <div class="grid g2">
+      <div>
+        <div class="card">
+          <h3 style="margin-bottom:10px">Route &amp; live position</h3>
+          <div class="mapbox"><div id="tripmap"></div></div>
+          <div class="small muted" id="locinfo" style="margin-top:8px">Waiting for GPS data...</div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:10px">Orders on this trip (${d.orders.length})</h3>
+          ${d.orders.map((o) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a2740">
+            <div><b>${esc(o.code)}</b> ${o.is_demo ? '<span class="demo-tag">DEMO</span>' : ''} ${badge(o.status)}<br>
+            <span class="small muted">${esc(o.pickup_addr)} &rarr; ${esc(o.delivery_addr)}</span></div>
+            <div style="text-align:right">${fmtM(o.price_cents)}<br><button class="btn sm danger" data-rmorder="${o.id}">Remove</button></div></div>`).join('')}
+          ${addable.length ? `<div style="display:flex;gap:8px;margin-top:12px"><select id="addorder" style="flex:1">${addable.map((o) => `<option value="${o.id}">${esc(o.code)} - ${esc(o.customer_name || '')} - ${fmtM(o.price_cents)}</option>`).join('')}</select>
+            <button class="btn sm" id="doadd">Add</button></div>` : '<div class="small muted" style="margin-top:10px">No unplanned orders available to add.</div>'}
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:10px">Costs <span class="muted small">(margin: <b style="color:${margin >= 0 ? 'var(--ok)' : 'var(--danger)'}">${fmtM(margin)}</b>)</span></h3>
+          ${d.costs.map((c) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a2740">
+            <span><b>${esc(c.kind)}</b> - <span class="muted small">${esc(c.note || '')}</span></span>
+            <span>${fmtM(c.amount_cents)} <button class="btn sm danger" data-rmcost="${c.id}">x</button></span></div>`).join('')}
+          <div class="grid g3" style="margin-top:12px;gap:8px">
+            <select id="ckind"><option value="fuel">Fuel</option><option value="toll">Toll</option><option value="other">Other</option></select>
+            <input id="camount" type="number" step="0.01" min="0" placeholder="Amount ${esc(COMPANY.currency)}">
+            <input id="cnote" placeholder="Note">
+          </div>
+          <button class="btn sm ghost" id="addcost" style="margin-top:8px">Add cost</button>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3 style="margin-bottom:10px">Assignment</h3>
+          <div class="small">Truck: <b>${esc(t.truck_plate || '-')}</b> &nbsp; Driver: <b>${esc(t.driver_name || '-')}</b> ${t.driver_phone ? '(' + esc(t.driver_phone) + ')' : ''}</div>
+          <div class="btnrow" style="margin-top:12px">
+            ${t.status === 'planned' ? '<button class="btn sm" data-st="loading">Start loading</button>' : ''}
+            ${t.status === 'loading' ? '<button class="btn sm teal" data-st="in_transit">Depart (in transit)</button>' : ''}
+            ${t.status === 'in_transit' ? '<button class="btn sm teal" data-st="completed">Complete trip</button>' : ''}
+            ${['planned', 'loading'].includes(t.status) ? '<button class="btn sm danger" data-st="cancelled">Cancel trip</button>' : ''}
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:10px">Driver link (live GPS + POD)</h3>
+          <div class="small muted" style="margin-bottom:8px">Send this link to the driver (WhatsApp/SMS). They open it on their phone - no login needed - to share live GPS, update status and collect the delivery signature.</div>
+          <div class="sharelink">${shareUrl}</div>
+          <div class="btnrow" style="margin-top:10px">
+            <button class="btn sm ghost" id="copylink">Copy link</button>
+            <button class="btn sm danger" id="regen">Regenerate</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:10px">Delivery (POD)</h3>
+          ${d.pod ? `<div class="notice">Signed by <b>${esc(d.pod.receiver_name)}</b> on ${fmtDT(d.pod.signed_at)}${d.pod.has_signature ? ' - signature captured' : ''}. <a href="/api/trips/${t.id}/pod.pdf" target="_blank">Open PDF</a></div>` : '<div class="small muted">Not signed yet. The driver collects it on their phone at delivery.</div>'}
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:10px">Timeline</h3>
+          <div class="timeline">${d.events.map((e) => `<div class="ev">${esc(e.note || e.kind)}<div class="small muted">${fmtDT(e.ts)}</div></div>`).join('')}</div>
+        </div>
+        <button class="btn danger sm" id="deltrip">Delete trip</button>
+      </div>
+    </div>`);
+  // actions
+  $$('[data-st]').forEach((b) => b.addEventListener('click', async () => {
+    if (b.dataset.st === 'cancelled' && !confirm('Cancel this trip?')) return;
+    await api(`/trips/${t.id}/status`, { method: 'POST', body: { status: b.dataset.st } });
+    vTripDetail(id);
+  }));
+  $('#doadd')?.addEventListener('click', async () => { await api(`/trips/${t.id}/orders`, { method: 'POST', body: { order_id: Number($('#addorder').value) } }); vTripDetail(id); });
+  $$('[data-rmorder]').forEach((b) => b.addEventListener('click', async () => { await api(`/trips/${t.id}/orders/${b.dataset.rmorder}`, { method: 'DELETE' }); vTripDetail(id); }));
+  $('#addcost')?.addEventListener('click', async () => {
+    if (!$('#camount').value) return toast('Enter an amount', true);
+    await api(`/trips/${t.id}/costs`, { method: 'POST', body: { kind: $('#ckind').value, amount: $('#camount').value, note: $('#cnote').value } });
+    vTripDetail(id);
+  });
+  $$('[data-rmcost]').forEach((b) => b.addEventListener('click', async () => { await api('/costs/' + b.dataset.rmcost, { method: 'DELETE' }); vTripDetail(id); }));
+  $('#copylink')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(shareUrl); toast('Link copied'); } catch { prompt('Copy this link:', shareUrl); } });
+  $('#regen')?.addEventListener('click', async () => { if (confirm('Old link stops working. Continue?')) { await api(`/trips/${t.id}/share/regenerate`, { method: 'POST' }); vTripDetail(id); } });
+  $('#deltrip')?.addEventListener('click', async () => { if (confirm('Delete this trip and its costs?')) { await api('/trips/' + t.id, { method: 'DELETE' }); location.hash = '#/trips'; } });
+
+  // map
+  if (window.L) {
+    const map = L.map('tripmap');
+    tileLayer().addTo(map);
+    const pts = [];
+    d.orders.forEach((o) => {
+      if (o.pickup_lat) { L.marker([o.pickup_lat, o.pickup_lon], { icon: pinIcon('#f5a524') }).addTo(map).bindPopup(`<b>Pickup</b> ${esc(o.code)}<br>${esc(o.pickup_addr)}`); pts.push([o.pickup_lat, o.pickup_lon]); }
+      if (o.delivery_lat) { L.marker([o.delivery_lat, o.delivery_lon], { icon: pinIcon('#2dd4bf') }).addTo(map).bindPopup(`<b>Delivery</b> ${esc(o.code)}<br>${esc(o.delivery_addr)}`); pts.push([o.delivery_lat, o.delivery_lon]); }
+    });
+    let trail = null, truck = null, fitted = false;
+    async function refreshLocs() {
+      try {
+        const locs = await api(`/trips/${t.id}/locations`);
+        if (!document.body.contains(map._container)) { clearInterval(tripPoll); return; }
+        if (locs.length) {
+          const latlngs = locs.map((l) => [l.lat, l.lon]);
+          if (!trail) trail = L.polyline(latlngs, { color: '#2dd4bf', weight: 3, opacity: 0.8 }).addTo(map);
+          else trail.setLatLngs(latlngs);
+          const last = latlngs[latlngs.length - 1];
+          if (!truck) truck = L.marker(last, { icon: truckIcon() }).addTo(map);
+          else truck.setLatLng(last);
+          $('#locinfo').innerHTML = `<span class="pulse"></span>Live GPS - last update ${fmtDT(locs[locs.length - 1].ts)} (${locs.length} pings)`;
+          if (!fitted) { map.fitBounds(L.latLngBounds([...pts, ...latlngs]).pad(0.2)); fitted = true; }
+        } else if (pts.length && !fitted) { map.fitBounds(L.latLngBounds(pts).pad(0.2)); fitted = true; }
+        else if (!fitted) { map.setView([30, 15], 2); fitted = true; }
+      } catch (e) { /* keep polling */ }
+    }
+    await refreshLocs();
+    clearInterval(tripPoll);
+    tripPoll = setInterval(refreshLocs, 12000);
+  }
+}
+
+// ---------- FLEET ----------
+async function vFleet() {
+  const [trucks, drivers] = await Promise.all([api('/trucks'), api('/drivers')]);
+  shell('#/fleet', `
+    ${topbar('Fleet', 'Your trucks and drivers')}
+    <div class="grid g2">
+      <div class="card"><div class="topbar" style="margin-bottom:8px"><h3>Trucks</h3><button class="btn sm" id="newtruck">+ Add truck</button></div>
+        <table><thead><tr><th>Plate</th><th>Vehicle</th><th>Capacity</th><th>Status</th><th></th></tr></thead><tbody>
+        ${trucks.map((t) => `<tr><td><b>${esc(t.plate)}</b>${t.is_demo ? ' <span class="demo-tag">DEMO</span>' : ''}</td><td class="small">${esc(t.label || '')}<br><span class="muted">${esc(t.type)}</span></td>
+          <td>${t.capacity_kg} kg</td><td>${badge(t.status)}</td><td><button class="btn sm danger" data-deltruck="${t.id}">x</button></td></tr>`).join('')}
+        </tbody></table></div>
+      <div class="card"><div class="topbar" style="margin-bottom:8px"><h3>Drivers</h3><button class="btn sm" id="newdriver">+ Add driver</button></div>
+        <table><thead><tr><th>Name</th><th>Phone</th><th>License</th><th>Status</th><th></th></tr></thead><tbody>
+        ${drivers.map((d) => `<tr><td><b>${esc(d.name)}</b>${d.is_demo ? ' <span class="demo-tag">DEMO</span>' : ''}</td><td>${esc(d.phone || '-')}</td>
+          <td class="small">${esc(d.license_no || '-')}</td><td>${badge(d.status)}</td><td><button class="btn sm danger" data-deldriver="${d.id}">x</button></td></tr>`).join('')}
+        </tbody></table></div>
+    </div>`);
+  $('#newtruck').addEventListener('click', () => modal('Add truck', `
+    <div class="grid g2"><div><label>Plate / registration</label><input name="plate" placeholder="e.g. AB 123 CD"></div>
+    <div><label>Label</label><input name="label" placeholder="e.g. Iveco Daily 35S"></div></div>
+    <div class="grid g2"><div><label>Type</label><select name="type"><option value="van">Van</option><option value="box">Box truck</option><option value="truck">Truck / lorry</option><option value="reefer">Refrigerated</option><option value="trailer">Trailer</option></select></div>
+    <div><label>Capacity (kg)</label><input name="capacity_kg" type="number" value="3500"></div></div>`,
+    async (data) => { if (!data.plate) throw new Error('Plate required'); data.capacity_kg = Number(data.capacity_kg || 0); await api('/trucks', { method: 'POST', body: data }); vFleet(); }, 'Add truck'));
+  $('#newdriver').addEventListener('click', () => modal('Add driver', `
+    <label>Name</label><input name="name" placeholder="Driver full name">
+    <div class="grid g2"><div><label>Phone</label><input name="phone" placeholder="+39 ..."></div>
+    <div><label>License no.</label><input name="license_no"></div></div>`,
+    async (data) => { if (!data.name) throw new Error('Name required'); await api('/drivers', { method: 'POST', body: data }); vFleet(); }, 'Add driver'));
+  $$('[data-deltruck]').forEach((b) => b.addEventListener('click', async () => { if (confirm('Delete this truck?')) { await api('/trucks/' + b.dataset.deltruck, { method: 'DELETE' }); vFleet(); } }));
+  $$('[data-deldriver]').forEach((b) => b.addEventListener('click', async () => { if (confirm('Delete this driver?')) { await api('/drivers/' + b.dataset.deldriver, { method: 'DELETE' }); vFleet(); } }));
+}
+
+// ---------- CUSTOMERS ----------
+async function vCustomers() {
+  const customers = await api('/customers');
+  shell('#/customers', `
+    ${topbar('Customers', 'Companies you transport for', `<button class="btn" id="new">+ New customer</button>`)}
+    <div class="card"><table><thead><tr><th>Name</th><th>Contact</th><th>Address</th><th>Notes</th><th></th></tr></thead><tbody>
+    ${customers.map((c) => `<tr><td><b>${esc(c.name)}</b>${c.is_demo ? ' <span class="demo-tag">DEMO</span>' : ''}</td>
+      <td class="small">${esc(c.phone || '')}<br><span class="muted">${esc(c.email || '')}</span></td>
+      <td class="small">${esc(c.address || '-')}</td><td class="small muted">${esc(c.notes || '')}</td>
+      <td><button class="btn sm danger" data-del="${c.id}">x</button></td></tr>`).join('')}
+    </tbody></table>${customers.length ? '' : '<div class="empty">No customers yet.</div>'}</div>`);
+  $('#new').addEventListener('click', () => modal('New customer', `
+    <label>Company name</label><input name="name">
+    <div class="grid g2"><div><label>Phone</label><input name="phone"></div><div><label>Email</label><input name="email" type="email"></div></div>
+    <label>Address</label><input name="address">
+    <label>Notes</label><textarea name="notes" rows="2"></textarea>`,
+    async (data) => { if (!data.name) throw new Error('Name required'); await api('/customers', { method: 'POST', body: data }); vCustomers(); }, 'Add customer'));
+  $$('[data-del]').forEach((b) => b.addEventListener('click', async () => { if (confirm('Delete this customer?')) { await api('/customers/' + b.dataset.del, { method: 'DELETE' }); vCustomers(); } }));
+}
+
+// ---------- REPORTS ----------
+async function vReports() {
+  const [sum, dash] = await Promise.all([api('/reports/summary'), api('/dashboard')]);
+  shell('#/reports', `
+    ${topbar('Reports', 'Costs, revenue and margins', `<a class="btn ghost" href="/api/reports/costs.csv">Download costs CSV</a>`)}
+    <div class="card"><h3 style="margin-bottom:12px">Revenue vs costs (6 months)</h3><div class="chart-box"><canvas id="rchart"></canvas></div></div>
+    <div class="grid g2">
+      <div class="card"><h3 style="margin-bottom:10px">Per truck</h3>
+        <table><thead><tr><th>Truck</th><th>Trips</th><th>Revenue</th><th>Costs</th><th>Margin</th></tr></thead><tbody>
+        ${sum.perTruck.map((t) => `<tr><td><b>${esc(t.plate)}</b></td><td>${t.trips}</td><td>${fmtM(t.revenue_cents)}</td><td>${fmtM(t.cost_cents)}</td>
+          <td style="color:${t.revenue_cents - t.cost_cents >= 0 ? 'var(--ok)' : 'var(--danger)'}">${fmtM(t.revenue_cents - t.cost_cents)}</td></tr>`).join('')}
+        </tbody></table></div>
+      <div class="card"><h3 style="margin-bottom:10px">Per driver</h3>
+        <table><thead><tr><th>Driver</th><th>Completed trips</th><th>Costs</th></tr></thead><tbody>
+        ${sum.perDriver.map((d) => `<tr><td><b>${esc(d.name)}</b></td><td>${d.trips}</td><td>${fmtM(d.cost_cents)}</td></tr>`).join('')}
+        </tbody></table>
+        <h3 style="margin:16px 0 10px">Cost breakdown</h3>
+        ${sum.perKind.map((k) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a2740"><span>${esc(k.kind)}</span><b>${fmtM(k.total)}</b></div>`).join('') || '<div class="muted small">No costs recorded yet.</div>'}
+      </div>
+    </div>
+    <div class="card"><h3 style="margin-bottom:10px">Top customers by revenue</h3>
+      <table><thead><tr><th>Customer</th><th>Delivered orders</th><th>Revenue</th></tr></thead><tbody>
+      ${sum.topCustomers.map((c) => `<tr><td><b>${esc(c.name)}</b></td><td>${c.orders}</td><td>${fmtM(c.revenue_cents)}</td></tr>`).join('')}
+      </tbody></table>${sum.topCustomers.length ? '' : '<div class="empty">Complete trips to see revenue here.</div>'}</div>`);
+  if (window.Chart) {
+    new Chart($('#rchart'), {
+      type: 'line',
+      data: { labels: dash.monthly.map((m) => m.month), datasets: [
+        { label: 'Revenue', data: dash.monthly.map((m) => m.revenue / 100), borderColor: '#2dd4bf', backgroundColor: '#2dd4bf22', fill: true, tension: 0.35 },
+        { label: 'Costs', data: dash.monthly.map((m) => m.costs / 100), borderColor: '#f5a524', backgroundColor: '#f5a52422', fill: true, tension: 0.35 },
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8fa3c2' } } },
+        scales: { x: { ticks: { color: '#8fa3c2' }, grid: { color: '#22304d' } }, y: { ticks: { color: '#8fa3c2' }, grid: { color: '#22304d' } } } },
+    });
+  }
+}
+
+// ---------- SETTINGS ----------
+async function vSettings() {
+  const c = await api('/settings');
+  shell('#/settings', `
+    ${topbar('Settings', 'Company profile and data')}
+    <div class="grid g2">
+      <div class="card"><h3 style="margin-bottom:6px">Company profile</h3>
+        <div class="small muted" style="margin-bottom:8px">Shown on DDT and POD documents.</div>
+        <label>Company name</label><input id="s-name" value="${esc(c.name || '')}">
+        <label>Address</label><input id="s-address" value="${esc(c.address || '')}">
+        <div class="grid g2">
+          <div><label>VAT / tax no.</label><input id="s-vat" value="${esc(c.vat || '')}"></div>
+          <div><label>Currency</label><select id="s-currency">${['EUR', 'USD', 'MYR', 'BDT', 'GBP'].map((x) => `<option ${c.currency === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+        </div>
+        <div class="grid g2">
+          <div><label>Phone</label><input id="s-phone" value="${esc(c.phone || '')}"></div>
+          <div><label>Email</label><input id="s-email" value="${esc(c.email || '')}"></div>
+        </div>
+        <button class="btn" id="save" style="margin-top:14px">Save</button>
+      </div>
+      <div>
+        <div class="card"><h3 style="margin-bottom:6px">Demo data</h3>
+          <div class="small muted" style="margin-bottom:10px">Explore FleetFlow with sample orders, trucks and drivers - all marked <span class="demo-tag">DEMO</span>. Remove them when you start real work.</div>
+          <div class="btnrow"><button class="btn ghost" id="seed">Load demo data</button><button class="btn danger" id="clear">Delete all demo data</button></div>
+        </div>
+        <div class="card"><h3 style="margin-bottom:6px">About FleetFlow</h3>
+          <div class="small muted" style="line-height:1.6">FleetFlow is a lightweight transport management system (TMS) built for small transport businesses: orders, trip planning, truck and driver assignment, live GPS from the driver's phone, DDT/POD documents and cost reports.<br><br>
+          It is not an enterprise system like SAP TM or Oracle OTM - it is the practical 80% a small fleet actually uses, on a 100% free stack (OpenStreetMap maps, open-source server, free hosting). No subscriptions, no per-user fees.</div>
+        </div>
+      </div>
+    </div>`);
+  $('#save').addEventListener('click', async () => {
+    await api('/settings', { method: 'PUT', body: { name: $('#s-name').value, address: $('#s-address').value, vat: $('#s-vat').value, currency: $('#s-currency').value, phone: $('#s-phone').value, email: $('#s-email').value } });
+    COMPANY = await api('/settings');
+    toast('Saved');
+  });
+  $('#seed').addEventListener('click', async () => { await api('/demo/seed', { method: 'POST' }); toast('Demo data loaded'); });
+  $('#clear').addEventListener('click', async () => { if (confirm('Delete all DEMO records?')) { await api('/demo/clear', { method: 'POST' }); toast('Demo data removed'); } });
+}
+
+// ---------- AUTH ----------
+async function vLogin(needsSetup) {
+  $('#app').innerHTML = `
+  <div class="auth-wrap"><div class="auth-card">
+    <div class="brand"><span class="dot"></span>FleetFlow</div>
+    <div class="tag">${needsSetup ? 'Create your owner account to start' : 'Transport management for small fleets'}</div>
+    ${needsSetup ? `<label>Company name</label><input id="a-company" placeholder="Your transport company">
+      <label>Your name</label><input id="a-name" placeholder="Full name">` : ''}
+    <label>Email</label><input id="a-email" type="email" autocomplete="${needsSetup ? 'email' : 'username'}">
+    <label>Password</label><input id="a-pass" type="password" autocomplete="${needsSetup ? 'new-password' : 'current-password'}">
+    ${needsSetup ? `<label>Currency</label><select id="a-currency"><option>EUR</option><option>USD</option><option>MYR</option><option>BDT</option><option>GBP</option></select>` : ''}
+    <button class="btn" id="go" style="width:100%;margin-top:16px;padding:12px">${needsSetup ? 'Create account & start' : 'Sign in'}</button>
+    <div id="aerr" style="margin-top:10px"></div>
+    <div class="small muted" style="margin-top:18px;text-align:center">Free &amp; open small-business TMS - maps by OpenStreetMap</div>
+  </div></div>`;
+  const go = async () => {
+    try {
+      const body = needsSetup
+        ? { company: $('#a-company').value, name: $('#a-name').value, email: $('#a-email').value, password: $('#a-pass').value, currency: $('#a-currency').value }
+        : { email: $('#a-email').value, password: $('#a-pass').value };
+      await api(needsSetup ? '/setup' : '/login', { method: 'POST', body });
+      location.hash = '#/dashboard';
+      location.reload();
+    } catch (e) { $('#aerr').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  $('#go').addEventListener('click', go);
+  $('#a-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+}
+
+// ---------- DRIVER MODE (public) ----------
+async function vDrive(tkn) {
+  let d;
+  try { d = await api('/drive/' + tkn); } catch (e) {
+    $('#app').innerHTML = `<div class="auth-wrap"><div class="auth-card"><div class="brand"><span class="dot"></span>FleetFlow</div>
+      <div class="err" style="margin-top:14px">This driver link is not valid or has expired. Ask the office for a new one.</div></div></div>`;
+    return;
+  }
+  const t = d.trip;
+  $('#app').innerHTML = `
+  <div class="drive">
+    <div class="brand" style="justify-content:center"><span class="dot"></span>FleetFlow</div>
+    <div class="tag small muted" style="text-align:center;margin-bottom:16px">Driver mode - trip <b style="color:var(--txt)">${esc(t.code)}</b> ${badge(t.status)}</div>
+    <div class="card">
+      <div class="small muted">Truck</div><div style="font-size:17px;font-weight:700">${esc(t.truck_plate || '-')}</div>
+      <div class="small muted" style="margin-top:8px">Stops (${d.orders.length})</div>
+      ${d.orders.map((o) => `<div style="padding:8px 0;border-bottom:1px solid #1a2740"><b>${esc(o.code)}</b> ${badge(o.status)}<br>
+        <span class="small">${esc(o.customer_name || '')}</span><br>
+        <span class="small muted">Pick: ${esc(o.pickup_addr)}</span><br>
+        <span class="small muted">Drop: ${esc(o.delivery_addr)}</span></div>`).join('')}
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px">Live GPS sharing</h3>
+      <div class="small muted" style="margin-bottom:10px">Shares your phone's position with the office map while this trip is active. You can stop anytime.</div>
+      <div class="statgrid">
+        <div class="stat"><div class="small muted">GPS</div><div id="gpsstate" class="gps-off">OFF</div></div>
+        <div class="stat"><div class="small muted">Updates sent</div><div id="gpscount" style="font-weight:700">0</div></div>
+      </div>
+      <button class="btn big-btn" id="gpstoggle">Start sharing my location</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px">Trip status</h3>
+      ${t.status === 'planned' || t.status === 'loading' ? `<button class="btn teal big-btn" id="depart">Depart - start driving</button>` : ''}
+      <div id="stmsg"></div>
+    </div>
+    <div class="card" id="podcard">
+      <h3 style="margin-bottom:10px">Proof of delivery</h3>
+      ${d.pod ? `<div class="notice">Delivered and signed by <b>${esc(d.pod.receiver_name)}</b> on ${fmtDT(d.pod.signed_at)}.</div>` : `
+      <label>Receiver name</label><input id="pod-name" placeholder="Who received the goods">
+      <label>Note (optional)</label><input id="pod-note" placeholder="e.g. left 1 pallet in warehouse 2">
+      <label>Receiver signature</label>
+      <canvas class="sigpad" id="sig"></canvas>
+      <div class="btnrow" style="margin-top:8px"><button class="btn ghost sm" id="sigclear">Clear signature</button></div>
+      <button class="btn teal big-btn" id="podsave" style="margin-top:14px">Confirm delivery</button>
+      <div id="podmsg" style="margin-top:8px"></div>`}
+    </div>
+  </div>`;
+
+  // GPS
+  let watchId = null, sent = 0;
+  $('#gpstoggle').addEventListener('click', () => {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId); watchId = null;
+      $('#gpsstate').textContent = 'OFF'; $('#gpsstate').className = 'gps-off';
+      $('#gpstoggle').textContent = 'Start sharing my location';
+      return;
+    }
+    if (!navigator.geolocation) { toast('This phone has no geolocation', true); return; }
+    watchId = navigator.geolocation.watchPosition(async (p) => {
+      try {
+        await api(`/drive/${tkn}/location`, { method: 'POST', body: { lat: p.coords.latitude, lon: p.coords.longitude, speed: p.coords.speed, heading: p.coords.heading, accuracy: p.coords.accuracy } });
+        sent++; $('#gpscount').textContent = sent;
+        $('#gpsstate').textContent = 'LIVE'; $('#gpsstate').className = 'gps-on';
+      } catch (e) { /* retry next tick */ }
+    }, (err) => { toast('GPS error: ' + err.message, true); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    $('#gpsstate').textContent = 'STARTING...'; $('#gpsstate').className = 'gps-on';
+    $('#gpstoggle').textContent = 'Stop sharing';
+  });
+  $('#depart')?.addEventListener('click', async () => {
+    await api(`/drive/${tkn}/status`, { method: 'POST', body: { status: 'in_transit' } });
+    $('#depart').remove(); $('#stmsg').innerHTML = '<div class="notice">Trip started. Drive safe!</div>';
+  });
+  // signature pad
+  const cv = $('#sig');
+  if (cv) {
+    const ctx = cv.getContext('2d');
+    const fit = () => { cv.width = cv.clientWidth * 2; cv.height = 360; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.strokeStyle = '#0f2a43'; };
+    fit();
+    let drawing = false;
+    const pos = (e) => { const r = cv.getBoundingClientRect(); const p = e.touches ? e.touches[0] : e; return [(p.clientX - r.left) * 2, (p.clientY - r.top) * 2]; };
+    const start = (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(...pos(e)); e.preventDefault(); };
+    const move = (e) => { if (drawing) { ctx.lineTo(...pos(e)); ctx.stroke(); e.preventDefault(); } };
+    const end = () => (drawing = false);
+    cv.onmousedown = start; cv.onmousemove = move; cv.onmouseup = end; cv.onmouseleave = end;
+    cv.ontouchstart = start; cv.ontouchmove = move; cv.ontouchend = end;
+    $('#sigclear').addEventListener('click', () => ctx.clearRect(0, 0, cv.width, cv.height));
+    $('#podsave').addEventListener('click', async () => {
+      const name = $('#pod-name').value.trim();
+      if (!name) { $('#podmsg').innerHTML = '<div class="err">Receiver name is required</div>'; return; }
+      let coords = {};
+      try { const p = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 })); coords = { lat: p.coords.latitude, lon: p.coords.longitude }; } catch (e) {}
+      $('#podsave').disabled = true;
+      try {
+        await api(`/drive/${tkn}/pod`, { method: 'POST', body: { receiver_name: name, note: $('#pod-note').value, signature: cv.toDataURL('image/png'), ...coords } });
+        $('#podcard').innerHTML = `<div class="notice">Delivery confirmed and signed by <b>${esc(name)}</b>. Thank you!</div>`;
+      } catch (e) { $('#podmsg').innerHTML = `<div class="err">${esc(e.message)}</div>`; $('#podsave').disabled = false; }
+    });
+  }
+}
+
+// ---------- router ----------
+async function route() {
+  clearInterval(tripPoll);
+  const h = location.hash || '#/dashboard';
+  const m = h.match(/^#\/drive\/(.+)$/);
+  if (m) return vDrive(m[1]);
+  if (!ME) return vLogin(_needsSetup);
+  if (h.startsWith('#/trips/')) return vTripDetail(h.split('/')[2]);
+  if (h === '#/orders') return vOrders();
+  if (h === '#/trips') return vTrips();
+  if (h === '#/fleet') return vFleet();
+  if (h === '#/customers') return vCustomers();
+  if (h === '#/reports') return vReports();
+  if (h === '#/settings') return vSettings();
+  return vDashboard();
+}
+
+let _needsSetup = false;
+
+(async () => {
+  try {
+    const b = await api('/bootstrap');
+    _needsSetup = b.needsSetup;
+    ME = b.user;
+    if (b.company) COMPANY.name = b.company;
+    try { if (ME) COMPANY = await api('/settings'); } catch (e) {}
+  } catch (e) {
+    $('#app').innerHTML = '<div class="boot">Cannot reach the server. Please reload.</div>';
+    return;
+  }
+  window.onhashchange = route;
+  route();
+})();
+
+</script>
+</body>
+</html>
